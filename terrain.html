@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Document</title>
+	<style>
+		body {
+			margin: 0;
+			overflow: hidden;
+		}
+	</style>
+</head>
+
+<body>
+	<canvas id="c"></canvas>
+
+	<!-- <script src="dat.gui.min.js"></script> -->
+	<script src="perlin.js"></script>
+	<script>
+
+		var c = document.getElementById("c");
+		var a = c.getContext("2d");
+		// var w = c.width = 1920;
+		// var h = c.height = 1080;
+		var w = c.width = 1280;
+		var h = c.height = 720;
+
+		var mapWidth = 120;
+		var mapDepth = 60;
+		var gridSize = 10; // 35
+		var fl = 50;
+
+		var camX = 0;
+		var camZ = 0;
+		var camZtemp = 0;
+		var viewZ = 13;
+
+		var stars = [];
+		// for (i = 0; i < 2000; i++) {
+		// 	stars.push({
+		// 		x: Math.random() * w,
+		// 		y: Math.random() * h / 2,
+		// 		w: Math.random() * 2,
+		// 		h: Math.random() * 2,
+		// 		opacity: Math.random() * 360,
+		// 		opacitySpeed: Math.random() * 30 + 5
+		// 	});
+		// }
+
+		var particles = [];
+		// for (i = 0; i < 0; i++) {
+		// 	particles.push({
+		// 		x: Math.random() * w * 8 - w * 4,
+		// 		y: Math.random() * h - 900,
+		// 		z: (Math.random() * -200),
+		// 		opacity: Math.random() * .4 + .6
+		// 	});
+		// }
+
+		var bgGrd = a.createLinearGradient(0, -h / 2, 0, h / 7);
+		bgGrd.addColorStop(0.000, 'rgba(33, 36, 69, 1.000)');
+		// bgGrd.addColorStop(0.101, 'rgba(7, 7, 124, 1.000)');
+		bgGrd.addColorStop(1.000, 'rgba(224, 77, 142, 1.000)')
+
+		var sunGrd = a.createLinearGradient(0, -200, 0, 40);
+		sunGrd.addColorStop(0.002, 'rgba(255, 127, 0, 1.000)');
+		sunGrd.addColorStop(1.000, 'rgba(255, 223, 45, 1.000)');
+
+		var gridGrd = a.createLinearGradient(0, - h / 5, 0, h / 2);
+		gridGrd.addColorStop(0.000, 'rgba(80, 135, 229, 1.000)');
+		gridGrd.addColorStop(0.900, 'rgba(138, 48, 229, 1.000)');
+
+		var frame = 0;
+		var maxframe = 360000;
+		var stop = false;
+
+		/*var capturer = new CCapture({
+			format: 'ffmpegserver',
+			// format: 'webm',
+			framerate: 60,
+			// verbose: true
+		});
+		var speed = .25123;
+		w = c.width = 1920;
+		h = c.height = 1080;*/
+
+		var capturer = {
+			capture: function () { },
+			stop: function () { },
+			save: function () { },
+			start: function () { },
+		};
+		var speed = .5;
+
+		var seed = 0;
+
+		function seedRandom() {
+			seed = (seed * 9301 + 49297) % 233280;
+			return seed / 233280;
+		}
+
+		noise.seed(Math.random());
+		// noise.seed(1);
+		// speed = 0;
+
+		a.translate(w / 2, h / 2);
+
+		function getNoiseHeight(x, z) {
+			var noisex = x;
+			var noisey = (z - camZ);
+			var rand = noise.simplex2(noisex / 100, noisey / 100);
+			var noisee = noise.simplex2(noisex / (30 + 30 * Math.abs(rand)), noisey / (20 + 30 * Math.abs(rand))) + 1.1;
+			var noisee2 = noise.simplex2(noisex / 12 + 5000, noisey / 12 + 5000);
+
+			noisee += noisee2 * 0.5;
+
+			var xfactor = 1;
+			var moveFactor = Math.sin((z - camZ) / 180 * Math.PI) * 3;
+			var valleyWidth = 8;
+			var center = mapWidth / 2 + moveFactor;
+
+			if (x >= (center - valleyWidth * Math.PI) && x <= (center + valleyWidth * Math.PI)) {
+				// xfactor = 0;
+				// xfactor = Math.abs(mapWidth / 2 + moveFactor - x) / valleyWidth;
+				// xfactor *= xfactor;
+				// xfactor = Math.max(.02, xfactor - .1);
+
+				// var angle = 3 * Math.PI / 2 + (x - mapWidth / 2) * Math.PI;
+				xfactor = Math.sin(((x - center) / valleyWidth) - (Math.PI / 2));
+				xfactor = Math.max(0.03, xfactor / 1.8 + .5);
+			}
+
+			return noisee * xfactor;
+		}
+
+		function getHeight(x, z) {
+			return getNoiseHeight(x, z) * 65 - 10;
+		}
+
+		function draw() {
+			a.fillStyle = bgGrd;
+			a.fillRect(-w / 2, -h / 2, w, h);
+
+			for (i = 0; i < stars.length; i++) {
+				var opacity = stars[i].opacity + frame * stars[i].opacitySpeed;
+				opacity = Math.sin(opacity * Math.PI / 360) + 1;
+				opacity /= 2;
+				// if(i == 0)console.log(opacity)
+
+				a.fillStyle = "rgba(255, 255, 255, " + opacity + ")";
+				a.fillRect(stars[i].x - w / 2, stars[i].y - h / 2, stars[i].w, stars[i].h);
+			}
+
+			a.fillStyle = sunGrd;
+
+			a.shadowOffsetX = 0;
+			a.shadowOffsetY = 0;
+			a.shadowBlur = 200;
+			a.shadowColor = "#ffff00";
+
+			a.globalAlpha = .6;
+			a.beginPath();
+			a.arc(0, -45, 155, 0, 2 * Math.PI);
+			a.fill();
+			a.globalAlpha = 1;
+
+			a.shadowBlur = 0;
+
+			camZtemp += speed;
+
+			if (camZtemp >= 1) {
+				camZtemp -= 1;
+				camZ++;
+			}
+
+			// TODO: adjust object position for 1920x1080 resolution
+
+			for (i = 0; i < particles.length; i++) {
+				particles[i].z += .5;
+				if (particles[i].z > 20) {
+					particles[i].x = Math.random() * w - w / 2;
+					particles[i].y = Math.random() * h - 900;
+					particles[i].z = -100;
+					particles[i].opacity = Math.random() * .4 + .6;
+				}
+
+				var p = fl / (fl - particles[i].z);
+				a.fillStyle = "rgba(255, 255, 255, " + particles[i].opacity + ")";
+				a.beginPath();
+				a.arc(particles[i].x * p, particles[i].y * p, Math.max(0, p) * 2, 0, 2 * Math.PI);
+				a.fill();
+			}
+
+			for (i = 0; i < mapDepth; i++) {
+
+				var light = Math.max(4, (40 - i) / 40 * 15) + 2;
+				// light = 1;
+
+				a.fillStyle = "hsl(273, 55%, " + light + "%)";
+				a.strokeStyle = gridGrd;
+				a.lineWidth = .7;
+				// a.lineWidth = 1.2;
+
+				for (j = 0; j < mapWidth; j++) {
+					// if ((mapDepth - i) + (mapWidth - j) < 70 || (mapDepth - i) + j < 50) continue;
+					a.beginPath();
+					line(j, i, 0);
+					line(j + 1, i, 1);
+					line(j + 1, i + 1, 1);
+					line(j, i + 1, 1);
+					// seed = (i-camZ + j) / 2 * (i-camZ + j + 1) + j;s\
+					a.fill();
+					a.stroke();
+				}
+
+				if (i < 3) {
+					a.shadowBlur = 0;
+					continue;
+				}
+
+				a.strokeStyle = "#b648f2";
+				a.lineWidth = Math.log2(i) * 1.3;
+
+				a.shadowOffsetX = 0;
+				a.shadowOffsetY = 0;
+				a.shadowBlur = Math.log2(i) * 5;
+				a.shadowColor = "#b261dd";
+
+				// if (i % 4 == 0) {
+				// 	a.beginPath();
+				// 	line(mapWidth / 2 - 3, i, 2);
+				// 	line(mapWidth / 2 + 3, i, 3);
+				// 	a.stroke();
+				// }
+
+				a.strokeStyle = "#CA97E6";
+
+				// a.beginPath();
+				// line(mapWidth / 2 - 2.5, i, 4);
+				// line(mapWidth / 2 - 2.5, i + 1, 5);
+				// line(mapWidth / 2 + 2.5, i, 4);
+				// line(mapWidth / 2 + 2.5, i + 1, 5);
+				// a.stroke();
+
+				a.beginPath();
+				line(mapWidth / 2, i, 4);
+				line(mapWidth / 2, i + 1, 5);
+				a.stroke();
+
+				a.shadowBlur = 0;
+			}
+
+			capturer.capture(c);
+
+			frame++;
+			if (frame >= maxframe) {
+				stop = true;
+				capturer.stop();
+				capturer.save();
+			}
+
+			if(!stop) requestAnimationFrame(draw);
+		}
+
+		capturer.start();
+		requestAnimationFrame(draw);
+
+		function line(posx, posz, type) {
+			var moveFactor = Math.sin((posz - camZ) / 180 * Math.PI) * 2;
+
+			var x = posx - mapWidth / 2;
+			var y = -getHeight(posx, posz);
+			var z = posz - viewZ;
+
+			z += camZtemp;
+
+			if (z > fl || x > mapWidth / 2 || x < - mapWidth / 2) return;
+			var p = fl / (fl - z);
+
+			// if (posz < 15) a.globalAlpha = posz / 15;
+			// else a.globalAlpha = 1;
+
+			if (type > 1) {
+				y = 4;
+				x += moveFactor;
+			}
+
+			if (type % 2 == 0) a.moveTo(x * gridSize * p, (z + y) * gridSize * p * .13);
+			else a.lineTo(x * gridSize * p, (z + y) * gridSize * p * .13);
+		}
+
+		document.onkeydown = e => {
+			if (e.keyCode == 38) camZ++;
+			else if (e.keyCode == 40) camZ--;
+		}
+
+	</script>
+
+</body>
+
+</html>
